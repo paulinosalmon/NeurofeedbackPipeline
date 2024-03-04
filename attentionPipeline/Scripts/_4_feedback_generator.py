@@ -71,7 +71,7 @@ def realtime_graph(root, right_frame, queue_graph_update):
             # Clear the previous plot and plot the updated data
             ax.clear()
             ax.plot(x_data, y_data, '-o', color='blue')
-            ax.axhline(0, color='black', linewidth=1)  # Add a horizontal line at y=0
+            ax.axhline(0, color='black', linewidth=1, linestyle='--')  # Add a horizontal line at y=0
             ax.axvline(0, color='black', linewidth=1)  # Add a vertical line at x=0
             ax.set_title("Feedback Observation (Task-Relevant Category: Scenes)")
             ax.set_xlabel("Trial Number")
