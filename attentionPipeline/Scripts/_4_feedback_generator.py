@@ -77,7 +77,7 @@ def realtime_graph(root, right_frame, queue_graph_update):
             ax.set_xlabel("Trial Number")
             ax.set_ylabel("Real-Time Category Decoding")
             ax.set_xlim(left=max(0, len(x_data) - 50), right=len(x_data) + 1)
-            ax.set_ylim(min(y_data)-0.1, max(y_data)+0.1)
+            ax.set_ylim(-1, 1)
 
             # Redraw the canvas with the new data
             canvas.draw()
@@ -101,7 +101,7 @@ def run_feedback_generator(queue_gui, queue_classifier, classifier_done, label_i
 
     while True:
 
-        alpha = queue_classifier.get(block=True)
+        alpha, category_decoding = queue_classifier.get(block=True)
         queue_gui.put(f"[{datetime.now()}] [Feedback Generator] Received alpha from classifier stream: {alpha}")
 
         # # Consistent 50-50 mix of images for training blocks
@@ -110,4 +110,4 @@ def run_feedback_generator(queue_gui, queue_classifier, classifier_done, label_i
         queue_gui.put(f"[{datetime.now()}] [Feedback Generator] Image Generated.")
 
         # Put the visibility score into the queue for the graph update
-        queue_graph_update.put(alpha)
+        queue_graph_update.put(category_decoding)

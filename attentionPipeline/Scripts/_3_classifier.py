@@ -135,7 +135,8 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
             # Send out 50-50 blend alpha
             alpha = 0.5
             print(f"[{datetime.now()}] [Classifier] Alpha fixed to 0.5 for training blocks.")
-            queue_classifier.put((alpha))
+            placeholder_classifier_output = 0
+            queue_classifier.put((alpha, placeholder_classifier_output))
             classifier_done.set()
 
             # Check if we have collected enough epochs for training
@@ -220,7 +221,7 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
             alpha = asymmetric_sigmoid_transfer(adjusted_classifier_output)
 
             queue_gui.put(f"[{datetime.now()}] [Classifier] Alpha computed for this trial: {alpha}")
-            queue_classifier.put((alpha))
+            queue_classifier.put((alpha, adjusted_classifier_output))
 
             # Signal that classifier processing is done for this batch
             classifier_done.set()
