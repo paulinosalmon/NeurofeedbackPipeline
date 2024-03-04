@@ -11,26 +11,7 @@ from datetime import datetime
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-def asymmetric_sigmoid_transfer(output, inflection_point=0.6, lower_bound=0.17, upper_bound=0.98):
-    """
-    Custom sigmoid function that maps the output to a specific range with an inflection point.
-    
-    Parameters:
-    - output: Input value or array
-    - inflection_point: The point at which the sigmoid curve has its midpoint
-    - lower_bound: The lower bound of the output range
-    - upper_bound: The upper bound of the output range
-    
-    Returns:
-    - Sigmoid output mapped between lower_bound and upper_bound
-    """
-    sigmoid_range = upper_bound - lower_bound
-
-    # Adjust the output to shift the sigmoid curve
-    adjusted_output = output - inflection_point
-
-    sigmoid_output = 1 / (1 + np.exp(-adjusted_output))
-    return lower_bound + sigmoid_range * sigmoid_output
+from settings import feeedback_path_init, training_state
 
 def adjust_pixel_range(image_array):
     # Adjust pixel values to have 10% in the ranges 0-46 and 210-255
@@ -112,22 +93,21 @@ def realtime_graph(root, right_frame, queue_graph_update):
     # Call the update function to start the updating process
     update_graph()
 
-def run_feedback_generator(queue_gui, queue_classifier, label_image, queue_graph_update):
+def run_feedback_generator(queue_gui, queue_classifier, classifier_done, label_image, queue_graph_update):
+
+    classifier_done.wait()  # Wait for preprocessing to complete
     queue_gui.put(f"[{datetime.now()}] [Feedback Generator] Feedback Generation Initiated.")
-    image_stimuli_path = '../imageStimuli'  # Path to the image stimuli
+    image_stimuli_path = feeedback_path_init()
 
     while True:
-        try:
-            classifier_output = queue_classifier.get(block=True)
-            alpha = asymmetric_sigmoid_transfer(classifier_output)
-            queue_gui.put(f"[{datetime.now()}] [Feedback Generator] Received alpha from classifier stream: {alpha}")
 
-            # Generate the image based on the received visibility score
-            tk_image = update_image(label_image, image_stimuli_path, alpha=alpha)
-            queue_gui.put(f"[{datetime.now()}] [Feedback Generator] Image Generated.")
+        alpha = queue_classifier.get(block=True)
+        queue_gui.put(f"[{datetime.now()}] [Feedback Generator] Received alpha from classifier stream: {alpha}")
 
-            # Put the visibility score into the queue for the graph update
-            queue_graph_update.put(alpha)
+        # # Consistent 50-50 mix of images for training blocks
+        # Generate the image based on the received alpha interpolation factor
+        tk_image = update_image(label_image, image_stimuli_path, alpha=alpha)
+        queue_gui.put(f"[{datetime.now()}] [Feedback Generator] Image Generated.")
 
-        except Exception as e:
-            queue_gui.put(f"[{datetime.now()}] [Feedback Generator] Error: {e}")
+        # Put the visibility score into the queue for the graph update
+        queue_graph_update.put(alpha)

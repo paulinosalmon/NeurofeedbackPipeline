@@ -9,8 +9,13 @@ import os
 
 ###### EXPERIMENTAL VARIABLES (experimentFunctions) ######
 subjID = '00' 
-expDay = '1'  # Neurofeedback day
+expDay = '0'  # Training day
+# expDay = '1'  # Neurofeedback day
 monitor_size = [1536, 824]
+
+# Training Settings
+training_state = 0 # If 0, this means feedback state is on
+training_trials = 50
 
 # Stimuli presentation times (in Hz)
 frameRate = 60
@@ -84,13 +89,17 @@ def script_path_init():
     script_path = base_dir_init() + '/Scripts'
     return script_path
 
-def data_path_init(): # Data (images) storage directory
+def feeedback_path_init(): # Data (images) storage directory
     data_path = base_dir_init() + '/imageStimuli'
     return data_path
 
 def subject_path_init(): # Subjects directory, for storing EEG data 
     subject_path = base_dir_init() + '/subjectsData'
     return subject_path
+
+def model_path_init(): # Models directory, for storing EEG data 
+    model_path = base_dir_init() + '/model'
+    return model_path
 
 if __name__ == '__main__':
     base_dir = base_dir_init()

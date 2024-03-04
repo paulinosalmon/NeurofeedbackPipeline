@@ -1,46 +1,95 @@
 import numpy as np
-from pylsl import StreamInfo, StreamOutlet, local_clock
-import time
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from pylsl import StreamInfo, StreamOutlet
 from settings import samplingRate, channelNames
+import threading
+import time
 
-# Simulate EEG data for testing
-def simulate_eeg_data():
-    eeg_data = np.random.randn(len(channelNames)) * 0.0001
-    # Introduce occasional spikes
-    if np.random.rand() < 0.1:  # 10% chance of a spike
-        spike_channel = np.random.choice(len(channelNames))
-        eeg_data[spike_channel] += np.random.choice([-5, 5]) * 0.001
-    timestamp = time.time()
-    label = np.random.choice([0, 1])  # Randomly choose between two states (0 for faces, 1 for scenes)
-    return eeg_data, label, timestamp
+# Set the parameters for the signal generation
+start_time = -0.1  # Start at -0.1 seconds
+end_time = 1
+time_array = np.arange(start_time, end_time, 1 / samplingRate)
+num_channels = len(channelNames)
 
-# Set up LSL stream for EEG data
-def create_lsl_stream():
-    # Define LSL stream parameters with an additional channel for the label
-    info = StreamInfo(name='EmotivEPOCX', type='EEG', channel_count=len(channelNames) + 1,
-                      channel_format='float32', source_id='epocx1234', nominal_srate=samplingRate)
-    # Add channel names to LSL info
-    channels = info.desc().append_child("channels")
-    for ch in channelNames:
-        channels.append_child("channel").append_child_value("label", ch)
-    # Add a channel for the label
-    channels.append_child("channel").append_child_value("label", "label")
-    # Create LSL outlet
-    outlet = StreamOutlet(info)
-    return outlet
+# Initialize the figure
+fig, ax = plt.subplots(figsize=(12, 24))
+lines = []
+for i, channel in enumerate(channelNames):
+    line, = ax.plot(time_array, np.zeros_like(time_array), label=channel)
+    lines.append(line)
 
-def stream_eeg_data(outlet):
+# Graph Settings
+ax.set_xlim(start_time, end_time)
+ax.set_xticks(np.arange(start_time, end_time + 0.1, 0.10))
+ax.set_xlabel('Time (s)')
+ax.set_ylabel('Channel')
+ax.set_yticks(range(0, 400 * num_channels, 400))
+ax.set_yticklabels(channelNames)
+ax.set_title('Synthetic EEG Signals - All Channels')
+fig.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, hspace=0.4)
+ax.set_ylim(-300, 400 * num_channels - 100)
+
+# Add vertical lines and color borders
+ax.axvline(x=0.0, color='black', linestyle='--')  # Add a vertical line at x = 0.0
+ax.axvspan(start_time, 0.0, facecolor='red', alpha=0.3)  # Color the region between -0.1 and 0.0
+ax.axvspan(0.0, 0.8, facecolor='green', alpha=0.3)  # Color the region between 0.0 and 0.8
+
+# Create an LSL stream
+info = StreamInfo(name='SyntheticEEG', type='EEG', channel_count=num_channels + 1, nominal_srate=samplingRate, channel_format='float32', source_id='random1234')
+outlet = StreamOutlet(info)
+
+# Define the duration of each epoch and calculate the number of samples per epoch
+epoch_duration = 0.9  # 900 ms
+samples_per_epoch = int(samplingRate * epoch_duration)
+
+# Function to generate and send data at a specific rate
+def transmit_data():
+    label = 0  # Start with label 0 for the first epoch
     while True:
-        simulated_data, label, timestamp = simulate_eeg_data()
-        print(f"[Data Acquisition] Streaming data: {simulated_data} with label: {label} at timestamp: {timestamp}")
-        outlet.push_sample(np.append(simulated_data, label), timestamp)  # Append label to data
-        # time.sleep(0.05)
-        time.sleep(1 / samplingRate)
+        # Generate the entire epoch at once
+        eeg_epoch = np.zeros((samples_per_epoch, len(channelNames)))
 
-def run_data_acquisition():
-    outlet = create_lsl_stream()
-    print("[Data Acquisition] Streaming simulated EEG data...")
-    stream_eeg_data(outlet)
+        for i in range(len(channelNames)):
+            # Add a sinusoidal component to simulate oscillatory activity
+            freq = np.random.choice([8, 10, 12])  # Randomly choose a frequency for the oscillation
+            amplitude = np.random.uniform(50, 100)  # Randomly choose an amplitude
+            phase = np.random.uniform(0, 2 * np.pi)  # Randomly choose a phase
+            sinusoid = amplitude * np.sin(2 * np.pi * freq * np.linspace(start_time, end_time, samples_per_epoch) + phase)
 
-if __name__ == '__main__':
-    run_data_acquisition()
+            # Add random noise
+            noise = np.random.normal(0, 20, samples_per_epoch)
+
+            # Combine the sinusoidal component and noise
+            eeg_epoch[:, i] = sinusoid + noise
+
+        # Normalize the data to be within the range [-200, 200]
+        eeg_epoch = 200 * (eeg_epoch - np.min(eeg_epoch)) / (np.max(eeg_epoch) - np.min(eeg_epoch)) - 200
+
+        # Append the label as a new column to the epoch
+        eeg_epoch_with_label = np.hstack((eeg_epoch, np.full((samples_per_epoch, 1), label)))
+
+        # Send the entire epoch with the label
+        for sample in eeg_epoch_with_label:
+            outlet.push_sample(sample)
+
+        label = 1 - label  # Toggle the label after each epoch
+        time.sleep(epoch_duration)  # Wait before starting the next epoch
+
+
+# Start the data transmission in a separate thread
+thread = threading.Thread(target=transmit_data)
+thread.daemon = True
+thread.start()
+
+def update(frame):
+    for i, channel in enumerate(channelNames):
+        eeg_signal = np.random.uniform(-200, 200, size=len(time_array))
+        lines[i].set_ydata(eeg_signal + 400 * i)
+    return lines
+
+# Create the animation
+ani = FuncAnimation(fig, update, frames=np.arange(100), blit=True, interval=2000)
+
+# Show the plot
+plt.show()

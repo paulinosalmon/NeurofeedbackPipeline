@@ -7,15 +7,11 @@ import signal
 from queue import Queue
 from _1_data_preprocessing import run_data_preprocessing
 from _2_artifact_rejection import run_artifact_rejection
-from _3_classifier import run_classifier, calculate_mean_error_rate_cv
+from _3_classifier import run_classifier
 from _4_feedback_generator import run_feedback_generator, realtime_graph
 
 def handle_keyboard_interrupt(signal, frame):
-    print("Interrupt received, evaluating model before shutting down.")
-    X_test = np.load(os.path.join("../data/", "X_test.npy"))
-    y_test = np.load(os.path.join("../data/", "y_test.npy"))
-    calculate_mean_error_rate_cv(X_test, y_test)
-    print("Evaluation saved in ../reports/. Shutting down.")
+    print("Interrupt received. Shutting down pipeline.")
     sys.exit(0)
 
 def update_output(gui_queue, text_widget, image_label=None):
@@ -71,10 +67,16 @@ def setup_gui():
     queue_gui_feedback = Queue()
     queue_graph_update = Queue()  # Queue for graph updates
 
+    queue_preprocessed_data = Queue()  # Preprocessing to AR bridge
     queue_artifact = Queue()  # Artifact rejection to classifier bridge
     queue_classifier = Queue()  # Classifier to feedback bridge
 
     # realtime_graph(root, right_frame, queue_gui_feedback)
+
+    # Thread Blocking for Pipeline Sync
+    preprocessing_done = threading.Event()
+    artifact_done = threading.Event()
+    classifier_done = threading.Event()
 
     # Threads for updating GUI based on different stages
     threading.Thread(target=update_output, args=(queue_gui_preprocessing, text_data_preprocessing), daemon=True).start()
@@ -83,10 +85,27 @@ def setup_gui():
     threading.Thread(target=update_output, args=(queue_gui_feedback, text_feedback, label_image), daemon=True).start()
 
     # Threads for different stages of the pipeline
-    threading.Thread(target=run_data_preprocessing, args=(queue_gui_preprocessing, queue_artifact), daemon=True).start()
-    threading.Thread(target=run_artifact_rejection, args=(queue_artifact, queue_gui_artifact), daemon=True).start()
-    threading.Thread(target=run_classifier, args=(queue_gui_classifier, queue_artifact, queue_classifier), daemon=True).start()
-    threading.Thread(target=run_feedback_generator, args=(queue_gui_feedback, queue_classifier, label_image, queue_graph_update), daemon=True).start()
+    threading.Thread(target=run_data_preprocessing, args=(queue_gui_preprocessing, 
+                                                          queue_preprocessed_data, 
+                                                          preprocessing_done), daemon=True).start()
+    
+    threading.Thread(target=run_artifact_rejection, args=(queue_gui_artifact, 
+                                                          queue_preprocessed_data, 
+                                                          queue_artifact, 
+                                                          preprocessing_done, 
+                                                          artifact_done), daemon=True).start()
+    
+    threading.Thread(target=run_classifier, args=(queue_gui_classifier, 
+                                                    queue_artifact, 
+                                                    queue_classifier, 
+                                                    artifact_done, 
+                                                    classifier_done), daemon=True).start()
+
+    threading.Thread(target=run_feedback_generator, args=(queue_gui_feedback, 
+                                                          queue_classifier, 
+                                                          classifier_done,
+                                                          label_image, 
+                                                          queue_graph_update), daemon=True).start()
 
     realtime_graph(root, right_frame, queue_graph_update)
 
