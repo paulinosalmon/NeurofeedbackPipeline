@@ -1,4 +1,4 @@
-![image](https://github.com/paulinosalmon/NeurofeedbackPipeline/assets/48361860/12815068-ae21-4acf-94c5-1fea43067418)# NeurofeedbackPipeline
+# NeurofeedbackPipeline
 
 ## I. Directory Contents
 ### The repository consists of 2 major directories:
