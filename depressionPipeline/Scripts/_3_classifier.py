@@ -10,7 +10,7 @@ from sklearn.model_selection import cross_val_score, cross_val_predict, Stratifi
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.base import clone
 
-from _0_model import create_cnn_model
+from _0_model import create_rnn_model
 import tensorflow as tf
 from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
@@ -19,17 +19,17 @@ from tensorflow.keras.models import load_model
 
 # ================== New Eval Functions ================== #
 
-def train_and_evaluate_cnn(X, y, input_shape=(23, 90, 1), num_classes=2):
+def train_and_evaluate_rnn(X, y, input_shape=(23, 90, 1), num_classes=2):
     # Split the data into training and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
     # Convert labels to binary (since we are using a sigmoid output)
     # If `y` is already binary, this step can be omitted
-    # y_train = y_train.astype(float)
-    # y_test = y_test.astype(float)
+    y_train = y_train.reshape((-1, 1)).astype(float)
+    y_test = y_test.reshape((-1, 1)).astype(float)
 
     # Create the CNN model
-    model = create_cnn_model(input_shape=input_shape, num_classes=num_classes)
+    model = create_rnn_model(input_shape=input_shape, num_classes=num_classes)
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
     # Setup the checkpoint path
@@ -188,7 +188,7 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
                 X_reshaped = np.array(all_epochs).reshape(-1, 23, 90, 1)
                 y_train = np.array(all_labels)
                 queue_gui.put(f"[{datetime.now()}] [Classifier] All samples collected. Training model...")
-                best_model, accuracy = train_and_evaluate_cnn(X_reshaped, y_train)
+                best_model, accuracy = train_and_evaluate_rnn(X_reshaped, y_train)
                 error_rate = round(100 - round(accuracy * 100, 2), 2)
                 queue_gui.put(f"[{datetime.now()}] [Classifier] CER: {error_rate}%")
 
