@@ -61,14 +61,25 @@ def train_and_evaluate_cnn(X, y, input_shape=(23, 90, 1), num_classes=2):
  
 # ================== Fine tuning after classifier output ==================== #
 
-def calculate_bias_offset(classifier, X, y, cv=3, limit=0.125):
+def calculate_bias_offset(model_path, X, y, cv=3, limit=0.125):
     """
     Calculate the bias offset based on cross-validation predicted probabilities.
     """
-    # Perform cross-validation and get the probabilities for the positive class
-    cross_val_probs = cross_val_predict(clone(classifier), X, y, cv=cv, method='predict_proba')
-    # Calculate the mean probability across folds for the positive class
-    mean_proba = np.mean(cross_val_probs[:, 1])
+    # Load the CNN model from the .keras file
+    model = load_model(model_path)
+
+    # Predict the probabilities for the positive class
+    probabilities = model.predict(X)
+    
+    # Assuming binary classification, the positive class probability is the second value
+    if probabilities.shape[1] == 2:
+        positive_class_probs = probabilities[:, 1]
+    else:
+        # If the model only outputs one probability per sample, it represents the positive class
+        positive_class_probs = probabilities[:, 0]
+
+    # Calculate the mean probability of the positive class across all samples
+    mean_proba = np.mean(positive_class_probs)
     # Calculate the bias as the deviation from the chance level (0.5)
     bias = mean_proba - 0.5
     # Limit the bias to within the specified range
@@ -145,7 +156,6 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
     model_directory = model_path_init()
 
     # The path where the trained classifier and score will be saved
-    model_path = f"{model_directory}/{subjID}_classifier.pkl"
     score_path = f"{model_directory}/{subjID}_classifier_score.txt"
 
     # Check if the directory exists, if not, create it
@@ -218,10 +228,11 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
             wma_list.append(current_wma[-1])  # Append only the WMA for the current epoch to the list
 
             # Flatten the WMA of the current epoch to match the shape expected by the classifier
-            X_wma_flattened = np.array(current_wma[-1]).reshape(1, -1)  # Reshape to (1, N)
+            # X_wma_flattened = np.array(current_wma[-1]).reshape(1, -1)  # Reshape to (1, N); Use only if not DL model
+            X_wma_flattened = np.array(current_wma[-1]).reshape(1, 23, 90, 1)
             
             # Load the pre-trained classifier
-            model_path = os.path.join(model_path_init(), f"{subjID}_best_cnn.h5")
+            model_path = os.path.join(model_path_init(), f"{subjID}_best_cnn.keras")
             model = load_model(model_path)
 
             # Load X_training data since first feedback block will have bias calculated based on this
@@ -232,14 +243,17 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
             y_train = np.load(training_labels_path)
             
             # Predict the probabilities using the loaded classifier
-            probabilities = model.predict_proba(X_wma_flattened)
-            
+            # probabilities = model.predict_proba(X_wma_flattened) # Use for non DL models
+            positive_proba = model.predict(X_wma_flattened)
+            negative_proba = 1 - positive_proba
+            probabilities = np.hstack([negative_proba, positive_proba])
+
             # Calculate the classifier output
             task_relevant_index = 1  # Assuming class 1 is task-relevant
             classifier_output = calculate_classifier_output(probabilities, task_relevant_index)
 
             # Calculate bias offset using the training data and labels
-            bias_offset = calculate_bias_offset(model, X_train, y_train, cv=3, limit=0.125)
+            bias_offset = calculate_bias_offset(model_path, X_train, y_train, cv=3, limit=0.125)
 
             # Adjust the classifier output for bias
             adjusted_classifier_output = classifier_output - bias_offset
