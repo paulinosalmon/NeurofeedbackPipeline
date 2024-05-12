@@ -5,7 +5,8 @@ import joblib
 import os
 
 from datetime import datetime
-from settings import model_path_init, subject_path_init, subjID, training_state, training_trials
+from settings import (model_path_init, subject_path_init, 
+                      subjID, training_state, training_trials)
 from sklearn.model_selection import cross_val_score, cross_val_predict, StratifiedKFold, train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.base import clone
@@ -19,7 +20,7 @@ from tensorflow.keras.models import load_model
 
 # ================== New Eval Functions ================== #
 
-def train_and_evaluate_rnn(X, y, input_shape=(23, 90, 1), num_classes=2):
+def train_and_evaluate_rnn(X, y, input_shape=(23, 110, 1), num_classes=2):
     # Split the data into training and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
@@ -167,7 +168,7 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
         queue_gui.put(f"[{datetime.now()}] [Classifier] Waiting for data...")
 
         # If training model first, only accept data as labelled X_training to identify resting state of patient
-        if training_state:
+        if training_state == 0 or training_state == 1: # dataset training or generative training
             X_processed, label = queue_artifact_rejection.get(block=True)
             all_epochs.append(X_processed)
             all_labels.append(label)
@@ -181,11 +182,12 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
             classifier_done.set()
 
             # Check if we have collected enough epochs for training
+            # Only in classifier.py, we check if all trials are present (1200 in sample data) then train them in one go
             if len(all_epochs) == training_trials:
                 # Reshape the data to 2D for the classifier
                 # Uncomment if not a CNN or if the input data does not need to be flattened
                 # X_reshaped = np.array(all_epochs).reshape(len(all_epochs), -1)
-                X_reshaped = np.array(all_epochs).reshape(-1, 23, 90, 1)
+                X_reshaped = np.array(all_epochs).reshape(-1, 23, 110, 1)
                 y_train = np.array(all_labels)
                 queue_gui.put(f"[{datetime.now()}] [Classifier] All samples collected. Training model...")
                 best_model, accuracy = train_and_evaluate_rnn(X_reshaped, y_train)
@@ -216,8 +218,8 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
                 # Break out of the loop after training
                 break
                     
-        # If feedback blocks are toggled          
-        else:
+        # If feedback blocks are toggled  (settings.training_state == 2)       
+        else: 
             
             # Get the cleaned test data and labels from the queue
             X_clean_test, labels = queue_artifact_rejection.get(block=True)
@@ -229,7 +231,7 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
 
             # Flatten the WMA of the current epoch to match the shape expected by the classifier
             # X_wma_flattened = np.array(current_wma[-1]).reshape(1, -1)  # Reshape to (1, N); Use only if not DL model
-            X_wma_flattened = np.array(current_wma[-1]).reshape(1, 23, 90, 1)
+            X_wma_flattened = np.array(current_wma[-1]).reshape(1, 23, 110, 1)
             
             # Load the pre-trained classifier
             model_path = os.path.join(model_path_init(), f"{subjID}_best_cnn.keras")

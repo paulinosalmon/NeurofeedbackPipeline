@@ -5,8 +5,8 @@ from keras.models import Sequential
 from keras.layers import LSTM, Dense, Dropout, Flatten, Reshape
 from settings import channelNames, channelNamesExcluded
 
-# Define the function to create the CNN model
-def create_rnn_model(input_shape=(23, 90, 1), num_classes=2):
+# Define the function to create the RNN model
+def create_rnn_model(input_shape=(23, 110, 1), num_classes=2):
     model = Sequential([
         # Reshape input to 2D time series
         Reshape((input_shape[0], input_shape[1] * input_shape[2]), input_shape=input_shape),

@@ -68,7 +68,7 @@ def run_artifact_rejection(queue_gui, queue_preprocessed_data, queue_artifact_re
         os.makedirs(significant_components_dir)
 
     ####################### If training day, perform denoising on X_training only #######################
-    if settings.training_state == 1:  # If training day
+    if settings.training_state == 0 or settings.training_state == 1:  # If training day
         queue_gui.put("[Artifact Rejection] Training state initiated.")
 
         # Path for significant components CSV file
@@ -108,7 +108,7 @@ def run_artifact_rejection(queue_gui, queue_preprocessed_data, queue_artifact_re
                 break
 
     ######################## If neurofeedback day, perform SVD on X_training and take into account X_noisy_test #######################
-    else:
+    else: # if settings.training_state == 2 for feedback
         # Load the significant components and K value from the saved files
         significant_components_path = f"{settings.subject_path_init()}/{settings.subjID}/significantComponents_{settings.subjID}_day_{settings.expDay}.csv"
         k_value_path = f"{significant_components_dir}/k_value_{settings.subjID}_day_{settings.expDay}.txt"
