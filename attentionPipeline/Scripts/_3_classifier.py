@@ -126,7 +126,7 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
         queue_gui.put(f"[{datetime.now()}] [Classifier] Waiting for data...")
 
         # If training model first, only accept data as labelled X_training to identify resting state of patient
-        if training_state:
+        if training_state == 0 or training_state == 1: # dataset training or generative training:
             X_processed, label = queue_artifact_rejection.get(block=True)
             all_epochs.append(X_processed)
             all_labels.append(label)
@@ -144,6 +144,7 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
                 # Reshape the data to 2D for the classifier
                 X_reshaped = np.array(all_epochs).reshape(len(all_epochs), -1)
                 y_train = np.array(all_labels)
+                print("x_shape:", X_reshaped.shape)
                 accuracy = train_and_score_classifier(classifier, X_reshaped, y_train)
                 error_rate = round(100 - round(accuracy * 100, 2), 2)
                 queue_gui.put(f"[{datetime.now()}] [Classifier] CER: {error_rate}%")
@@ -191,6 +192,7 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
 
             # Flatten the WMA of the current epoch to match the shape expected by the classifier
             X_wma_flattened = np.array(current_wma[-1]).reshape(1, -1)  # Reshape to (1, N)
+            print("shape:", X_wma_flattened.shape)
             
             # Load the pre-trained classifier
             model_directory = os.path.join(model_path_init(), subjID)

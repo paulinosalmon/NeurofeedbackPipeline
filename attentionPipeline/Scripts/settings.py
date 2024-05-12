@@ -14,8 +14,13 @@ expDay = '0'  # Training day
 monitor_size = [1536, 824]
 
 # Training Settings
-training_state = 0 # If 0, this means feedback state is on
-training_trials = 50
+'''
+0 - dataset training
+1 - EEG live training
+2 - feedback
+'''
+training_state = 0
+training_trials = 1200
 
 # Stimuli presentation times (in Hz)
 frameRate = 60

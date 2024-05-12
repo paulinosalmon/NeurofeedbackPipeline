@@ -102,10 +102,10 @@ def setup_gui():
                                                     classifier_done), daemon=True).start()
 
     threading.Thread(target=run_feedback_generator, args=(queue_gui_feedback, 
-                                                          queue_classifier, 
-                                                          classifier_done,
-                                                          label_image, 
-                                                          queue_graph_update), daemon=True).start()
+                                                           queue_classifier, 
+                                                           classifier_done,
+                                                           label_image, 
+                                                           queue_graph_update), daemon=True).start()
 
     realtime_graph(root, right_frame, queue_graph_update)
 

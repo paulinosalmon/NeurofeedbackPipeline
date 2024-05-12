@@ -3,7 +3,8 @@ from pylsl import StreamInlet, resolve_stream
 import mne
 from scipy.signal import detrend
 from settings import (samplingRate, channelNames, 
-                      rejectChannels, channelNamesExcluded)
+                      rejectChannels, channelNamesExcluded, training_state)
+import time
 
 # Resolve the EEG stream
 print("Looking for an EEG stream...")
@@ -42,6 +43,33 @@ def process_continuous_eeg(gui_queue, data_transfer_queue, preprocessing_done):
     eeg_buffer = np.empty((len(channelNames), 0))
     label_buffer = []  # Buffer to store labels
     trial_counter = 0  # Counter for the number of trials processed
+
+    if training_state == 0:
+        gui_queue.put(f"[Data Preprocessing] Dataset mode active.")
+        dataset_X = np.load('../data/train/EEG_epochs_sample.npy')
+        dataset_y = np.load('../data/train/y_categories_sample.npy')
+
+        # Swap the 'samples' and 'channels' dimensions in dataset_X
+        # New shape will be [1200 trials, 32 channels, 550 samples]
+        dataset_X = np.transpose(dataset_X, (0, 2, 1))        
+
+        # Iterate through each trial and corresponding label
+        dataset_counter = 1
+        for trial_data, current_label in zip(dataset_X, dataset_y):
+            # Package the trial data and label together
+            gui_queue.put(f"[Trial {dataset_counter}/{len(dataset_X)}]")
+            processed_data = preprocess_eeg(trial_data, channelNames)
+
+            gui_queue.put(f"[Reading Dataset...] Data shape: {processed_data.shape}")
+            gui_queue.put(f"[Reading Dataset...] Label: {current_label}")
+
+            data_transfer_queue.put((processed_data, current_label))  # Send both data and label
+            time.sleep(0.5)
+            dataset_counter += 1
+            preprocessing_done.set()
+            
+        gui_queue.put(f"[Data Preprocessing] Full dataset sent.")
+    
 
     while True:
         sample, timestamp = inlet.pull_sample()
