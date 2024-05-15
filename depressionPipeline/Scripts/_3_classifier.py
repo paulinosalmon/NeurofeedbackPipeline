@@ -11,7 +11,7 @@ from sklearn.model_selection import cross_val_score, cross_val_predict, Stratifi
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.base import clone
 
-from _0_model import create_rnn_model
+from _0_model import create_eeg_model
 import tensorflow as tf
 from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
@@ -30,7 +30,7 @@ def train_and_evaluate_rnn(X, y, input_shape=(23, 110, 1), num_classes=2):
     y_test = y_test.reshape((-1, 1)).astype(float)
 
     # Create the CNN model
-    model = create_rnn_model(input_shape=input_shape, num_classes=num_classes)
+    model = create_eeg_model(input_shape=input_shape, num_classes=num_classes)
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
     # Setup the checkpoint path
@@ -49,7 +49,7 @@ def train_and_evaluate_rnn(X, y, input_shape=(23, 110, 1), num_classes=2):
     )
 
     # Train the model with the checkpoint callback
-    model.fit(X_train, y_train, epochs=10, batch_size=64, validation_data=(X_test, y_test), callbacks=[checkpoint_callback])
+    model.fit(X_train, y_train, epochs=50, batch_size=64, validation_data=(X_test, y_test), callbacks=[checkpoint_callback])
 
     # Load the best model saved
     best_model = load_model(model_path)
