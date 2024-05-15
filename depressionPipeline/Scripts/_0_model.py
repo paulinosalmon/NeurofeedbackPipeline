@@ -1,8 +1,10 @@
 # Separate script for the deep learning model for easier modularity
 
+import tensorflow as tf
+import math
 from tensorflow.keras.models import Sequential
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, Dropout, Flatten, Reshape, SimpleRNN, GRU
+from keras.layers import LSTM, Dense, Dropout, Flatten, Reshape, SimpleRNN, GRU, Bidirectional
 from settings import channelNames, channelNamesExcluded
 
 # Define the function to create the RNN model
@@ -25,3 +27,9 @@ def create_eeg_model(input_shape=(23, 110, 1), num_classes=2):
         Dense(1, activation='sigmoid')  # Shape: (None, 1)
     ])
     return model
+    
+def scheduler(epoch, lr):
+    if epoch < 10:
+        return lr
+    else:
+        return lr * math.exp(-0.1)

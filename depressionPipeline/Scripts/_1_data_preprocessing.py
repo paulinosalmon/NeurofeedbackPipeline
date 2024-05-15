@@ -54,6 +54,13 @@ def process_continuous_eeg(gui_queue, data_transfer_queue, preprocessing_done):
         # New shape will be [1200 trials, 32 channels, 550 samples]
         dataset_X = np.transpose(dataset_X, (0, 2, 1))        
 
+        # Create a permutation based on the number of entries
+        permutation = np.random.permutation(dataset_X.shape[0])
+
+        # Shuffle both dataset_X and dataset_y according to the same permutation
+        dataset_X = dataset_X[permutation]
+        dataset_y = dataset_y[permutation]
+
         # Iterate through each trial and corresponding label
         dataset_counter = 1
         for trial_data, current_label in zip(dataset_X, dataset_y):

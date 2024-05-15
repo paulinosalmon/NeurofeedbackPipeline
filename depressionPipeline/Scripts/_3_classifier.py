@@ -7,49 +7,52 @@ import os
 from datetime import datetime
 from settings import (model_path_init, subject_path_init, 
                       subjID, training_state, training_trials)
-from sklearn.model_selection import cross_val_score, cross_val_predict, StratifiedKFold, train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.base import clone
 
-from _0_model import create_eeg_model
-import tensorflow as tf
-from tensorflow.keras.utils import to_categorical
-from sklearn.model_selection import train_test_split
-from tensorflow.keras.callbacks import ModelCheckpoint
-from tensorflow.keras.models import load_model
-
+from _0_model import create_eeg_model, scheduler
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler
+from tensorflow.keras.models import load_model, Sequential
+from tensorflow.keras.layers import GRU, Dense, Dropout, Flatten, Reshape
+from tensorflow.keras.optimizers import Adam
 # ================== New Eval Functions ================== #
 
-def train_and_evaluate_rnn(X, y, input_shape=(23, 110, 1), num_classes=2):
-    # Split the data into training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-
-    # Convert labels to binary (since we are using a sigmoid output)
-    # If `y` is already binary, this step can be omitted
+def train_and_evaluate_eeg_model(X, y, input_shape=(23, 110, 1), num_classes=2, normalize=False):
+    # Stratified split to ensure similar distribution of the target variable in training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+    
+    # Convert labels to binary (if necessary)
     y_train = y_train.reshape((-1, 1)).astype(float)
     y_test = y_test.reshape((-1, 1)).astype(float)
+    
+    if normalize:
+        # Normalize the data
+        scaler = StandardScaler()
+        X_train_reshaped = X_train.reshape(-1, X_train.shape[-1])
+        X_test_reshaped = X_test.reshape(-1, X_test.shape[-1])
+        X_train_reshaped = scaler.fit_transform(X_train_reshaped)
+        X_test_reshaped = scaler.transform(X_test_reshaped)
+        X_train = X_train_reshaped.reshape(X_train.shape)
+        X_test = X_test_reshaped.reshape(X_test.shape)
 
-    # Create the CNN model
+    # Create the model
     model = create_eeg_model(input_shape=input_shape, num_classes=num_classes)
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
+    
     # Setup the checkpoint path
-    model_path = os.path.join(model_path_init(), f"{subjID}_best_cnn.keras")
+    model_path = os.path.join(model_path_init(), "best_model.keras")
     model_dir = os.path.dirname(model_path)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
-    # Setup model checkpoint to save only the best model based on validation accuracy
-    checkpoint_callback = ModelCheckpoint(
-        filepath=model_path, 
-        monitor='val_accuracy', 
-        verbose=1, 
-        save_best_only=True, 
-        mode='max'
-    )
+    # Setup callbacks
+    checkpoint_callback = ModelCheckpoint(filepath=model_path, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+    lr_scheduler_callback = LearningRateScheduler(scheduler)
 
-    # Train the model with the checkpoint callback
-    model.fit(X_train, y_train, epochs=50, batch_size=64, validation_data=(X_test, y_test), callbacks=[checkpoint_callback])
+    # Train the model with the callbacks
+    history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), 
+                        callbacks=[checkpoint_callback, early_stopping_callback, lr_scheduler_callback])
 
     # Load the best model saved
     best_model = load_model(model_path)
@@ -190,7 +193,7 @@ def run_classifier(queue_gui, queue_artifact_rejection, queue_classifier, artifa
                 X_reshaped = np.array(all_epochs).reshape(-1, 23, 110, 1)
                 y_train = np.array(all_labels)
                 queue_gui.put(f"[{datetime.now()}] [Classifier] All samples collected. Training model...")
-                best_model, accuracy = train_and_evaluate_rnn(X_reshaped, y_train)
+                best_model, accuracy = train_and_evaluate_eeg_model(X_reshaped, y_train)
                 error_rate = round(100 - round(accuracy * 100, 2), 2)
                 queue_gui.put(f"[{datetime.now()}] [Classifier] CER: {error_rate}%")
 
