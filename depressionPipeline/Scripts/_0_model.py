@@ -1,28 +1,38 @@
 import math
 import tensorflow as tf
 from tensorflow.keras.layers import (Dense, Flatten, Dropout, Reshape, GRU, Input, 
-                                    LayerNormalization, MultiHeadAttention, Add, Activation)
-from tensorflow.keras.models import Model, Sequential
+                                    LayerNormalization, Add, Activation, Attention, GlobalAveragePooling1D)
+from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam                
 
-def create_eeg_model(input_shape=(23, 110, 1), num_classes=2):
+def simple_self_attention(inputs, ff_dim=128, dropout=0.25):
+    # Simple Self-Attention
+    attn_output = Attention()([inputs, inputs])
+    attn_output = Dropout(dropout)(attn_output)
+    res = Add()([attn_output, inputs])
+    
+    # Feed Forward Network
+    ff_output = Dense(ff_dim, activation='relu')(res)
+    ff_output = Dropout(dropout)(ff_output)
+    ff_output = Dense(inputs.shape[-1])(ff_output)
+    res = Add()([ff_output, res])
+    
+    return res
+
+def create_eeg_model(input_shape=(23, 110, 1), num_classes=2, ff_dim=128, dropout=0.25):
     inputs = Input(shape=input_shape)
     
-    # Reshape input to match the format required for GRU
-    x = Reshape((input_shape[0] * input_shape[1], input_shape[2]))(inputs)  # Shape: (None, 2530, 1)
+    x = Reshape((input_shape[0] * input_shape[1], input_shape[2]))(inputs)
+    x = GRU(128, return_sequences=True)(x)
     
-    # GRU layer
-    x = GRU(128, return_sequences=True)(x)  # Shape: (None, 2530, 128)
+    # Apply Simple Self-Attention with Feed Forward Network
+    x = simple_self_attention(x, ff_dim, dropout)
     
-    # Flatten layer
-    x = Flatten()(x)  # Shape: (None, 323840)
-    
-    # Dense layer
-    x = Dense(64, activation='relu', kernel_regularizer='l2')(x)  # Shape: (None, 64)
+    x = Flatten()(x)
+    x = Dense(64, activation='relu', kernel_regularizer='l2')(x)
     x = Dropout(0.5)(x)
     
-    # Output layer for binary classification
-    outputs = Dense(1, activation='sigmoid')(x)  # Shape: (None, 1)
+    outputs = Dense(1, activation='sigmoid')(x)
     
     model = Model(inputs=inputs, outputs=outputs)
     

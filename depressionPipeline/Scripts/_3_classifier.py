@@ -15,6 +15,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, LearningR
 from tensorflow.keras.models import load_model, Sequential
 from tensorflow.keras.layers import GRU, Dense, Dropout, Flatten, Reshape
 from tensorflow.keras.optimizers import Adam
+
 # ================== New Eval Functions ================== #
 
 def train_and_evaluate_eeg_model(X, y, input_shape=(23, 110, 1), num_classes=2, normalize=False):
@@ -51,7 +52,7 @@ def train_and_evaluate_eeg_model(X, y, input_shape=(23, 110, 1), num_classes=2, 
     lr_scheduler_callback = LearningRateScheduler(scheduler)
 
     # Train the model with the callbacks
-    history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), 
+    history = model.fit(X_train, y_train, epochs=50, batch_size=16, validation_data=(X_test, y_test), 
                         callbacks=[checkpoint_callback, early_stopping_callback, lr_scheduler_callback])
 
     # Load the best model saved
@@ -60,6 +61,7 @@ def train_and_evaluate_eeg_model(X, y, input_shape=(23, 110, 1), num_classes=2, 
     # Evaluate the best model
     test_loss, test_acc = best_model.evaluate(X_test, y_test)
     print(f'Test accuracy: {test_acc}')
+    print(f'CER: {1 - test_acc}')
 
     return best_model, test_acc
  
