@@ -5,7 +5,7 @@ from tensorflow.keras.layers import (Dense, Flatten, Dropout, Reshape, GRU, Inpu
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam                
 
-def simple_self_attention(inputs, ff_dim=128, dropout=0.25):
+def transformer_block(inputs, ff_dim=128, dropout=0.25):
     # Simple Self-Attention
     attn_output = Attention()([inputs, inputs])
     attn_output = Dropout(dropout)(attn_output)
@@ -19,14 +19,20 @@ def simple_self_attention(inputs, ff_dim=128, dropout=0.25):
     
     return res
 
-def create_eeg_model(input_shape=(23, 110, 1), num_classes=2, ff_dim=128, dropout=0.25):
+def create_eeg_model(input_shape=(23, 110, 1), 
+                     num_classes=2, 
+                     ff_dim=128, 
+                     dropout=0.25,
+                     num_transformer_blocks=3):
+    
     inputs = Input(shape=input_shape)
     
     x = Reshape((input_shape[0] * input_shape[1], input_shape[2]))(inputs)
     x = GRU(128, return_sequences=True)(x)
     
-    # Apply Simple Self-Attention with Feed Forward Network
-    x = simple_self_attention(x, ff_dim, dropout)
+    # Apply multiple Transformer Blocks with Simple Attention
+    for _ in range(num_transformer_blocks):
+        x = transformer_block(x, ff_dim, dropout)
     
     x = Flatten()(x)
     x = Dense(64, activation='relu', kernel_regularizer='l2')(x)
