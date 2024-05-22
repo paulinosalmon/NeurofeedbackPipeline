@@ -1,0 +1,6 @@
+Model error rate: 32.78
+Precision: 0.6666666666666666
+Recall: 0.6888888888888889
+F1-Score: 0.6775956284153005
+Confusion Matrix: [[118  62]
+ [ 56 124]]
